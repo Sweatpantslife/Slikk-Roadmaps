@@ -1,6 +1,7 @@
+import Link from "next/link";
 import { Suspense } from "react";
 import { SITE } from "@/lib/config";
-import { getDisplayName } from "@/lib/identity";
+import { getCurrentUser } from "@/lib/auth";
 import { getBoardPosts, getCategoryCounts, getVotedPostIds } from "@/lib/queries";
 import { isCategory, isSort, type Category, type Sort } from "@/lib/types";
 import { BoardFilterBar } from "@/components/BoardFilterBar";
@@ -23,10 +24,10 @@ export default async function BoardPage({ searchParams }: { searchParams: Promis
   const sort: Sort = isSort(sortRaw) ? sortRaw : "top";
   const appId = first(params.app) || undefined;
 
-  const [posts, counts, defaultName] = await Promise.all([
+  const [posts, counts, user] = await Promise.all([
     getBoardPosts({ q: q || undefined, category, appId, sort }),
     getCategoryCounts({ q: q || undefined, appId }),
-    getDisplayName(),
+    getCurrentUser(),
   ]);
   const votedIds = await getVotedPostIds(posts.map((p) => p.id));
 
@@ -42,8 +43,23 @@ export default async function BoardPage({ searchParams }: { searchParams: Promis
         <div className="max-w-xl">
           <h1 className="text-2xl font-semibold tracking-tight text-stone-900 sm:text-3xl">{SITE.heroTitle}</h1>
           <p className="mt-2 text-[15px] leading-relaxed text-stone-500">{SITE.heroSubtitle}</p>
+          <Link href="/guidelines" className="mt-1.5 inline-block text-sm font-medium text-violet-700 hover:underline">
+            Posting guidelines →
+          </Link>
         </div>
-        <NewPostDialog defaultName={defaultName} />
+        {user ? (
+          <NewPostDialog />
+        ) : (
+          <Link
+            href="/register?next=/"
+            className="inline-flex items-center gap-1.5 self-start rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-violet-700 sm:self-auto"
+          >
+            <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" aria-hidden="true">
+              <path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            </svg>
+            Create a post
+          </Link>
+        )}
       </section>
 
       <CategoryTabs active={category} counts={counts} searchParams={carriedParams} />
@@ -56,7 +72,7 @@ export default async function BoardPage({ searchParams }: { searchParams: Promis
 
       <div className="mt-5 space-y-3">
         {posts.map((post) => (
-          <PostCard key={post.id} post={post} voted={votedIds.has(post.id)} />
+          <PostCard key={post.id} post={post} voted={votedIds.has(post.id)} signedIn={!!user} />
         ))}
 
         {posts.length === 0 && (

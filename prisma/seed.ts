@@ -4,16 +4,37 @@
  * and recreates everything.
  *
  *   npm run db:seed
+ *
+ * Accounts created:
+ *   - Admin:      ADMIN_EMAIL / ADMIN_PASSWORD (defaults below)
+ *   - Demo users: maya@example.com, tom@example.com, … all with password "slikk-demo"
  */
 import { PrismaClient } from "@prisma/client";
+import { randomBytes, scryptSync } from "crypto";
 
 const prisma = new PrismaClient();
 
-const TEAM_AUTHOR = "seed-team";
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL ?? "admin@slikk.app";
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? "slikk-admin";
+const DEMO_PASSWORD = "slikk-demo";
+
+function hashPassword(password: string): string {
+  const salt = randomBytes(16).toString("hex");
+  const hash = scryptSync(password, salt, 64).toString("hex");
+  return `${salt}:${hash}`;
+}
 
 function daysAgo(n: number): Date {
   return new Date(Date.now() - n * 24 * 60 * 60 * 1000);
 }
+
+const NAMED_USERS = [
+  "Maya", "Tom", "Priya", "Jonas", "Elena", "Ravi", "Kim", "Ana", "Diego", "Fatima",
+  "Lena", "Stefan", "Noor", "Marta", "Chris", "Hana", "Yuki", "Omar", "Greta", "Bo", "Pieter",
+];
+
+/** Extra accounts used purely to make vote counts real. */
+const FILLER_VOTERS = 40;
 
 type SeedPost = {
   title: string;
@@ -21,7 +42,7 @@ type SeedPost = {
   category: "FEATURE" | "IMPROVEMENT" | "BUG";
   appId: string | null;
   status: "UNDER_REVIEW" | "PLANNED" | "IN_PROGRESS" | "SHIPPED" | "CLOSED";
-  authorName: string;
+  author: string;
   votes: number;
   /** How many of the votes landed in the last two weeks (drives "Trending"). */
   recentVotes?: number;
@@ -29,7 +50,7 @@ type SeedPost = {
   shippedDaysAgo?: number;
   pinned?: boolean;
   officialResponse?: string;
-  comments?: { authorName: string; body: string; isTeam?: boolean; daysAgo: number }[];
+  comments?: { author: string; body: string; isTeam?: boolean; daysAgo: number }[];
 };
 
 const POSTS: SeedPost[] = [
@@ -39,7 +60,7 @@ const POSTS: SeedPost[] = [
     category: "FEATURE",
     appId: null,
     status: "IN_PROGRESS",
-    authorName: "Maya",
+    author: "Maya",
     votes: 48,
     recentVotes: 9,
     createdDaysAgo: 62,
@@ -47,9 +68,9 @@ const POSTS: SeedPost[] = [
     officialResponse:
       "We're on it! Dark mode is in active development and will roll out to **web first**, then desktop and mobile. Follow this post for updates.",
     comments: [
-      { authorName: "Tom", body: "Yes please — my eyes will thank you. OLED black would be amazing on mobile.", daysAgo: 60 },
-      { authorName: "Priya", body: "Would love scheduled switching too (light during the day, dark at night).", daysAgo: 41 },
-      { authorName: "Slikk Team", body: "Update: dark mode is now in internal testing. Scheduled switching made the cut!", isTeam: true, daysAgo: 12 },
+      { author: "Tom", body: "Yes please — my eyes will thank you. OLED black would be amazing on mobile.", daysAgo: 60 },
+      { author: "Priya", body: "Would love scheduled switching too (light during the day, dark at night).", daysAgo: 41 },
+      { author: "TEAM", body: "Update: dark mode is now in internal testing. Scheduled switching made the cut!", isTeam: true, daysAgo: 12 },
     ],
   },
   {
@@ -58,12 +79,12 @@ const POSTS: SeedPost[] = [
     category: "FEATURE",
     appId: "mobile",
     status: "PLANNED",
-    authorName: "Jonas",
+    author: "Jonas",
     votes: 41,
     recentVotes: 14,
     createdDaysAgo: 35,
     comments: [
-      { authorName: "Elena", body: "This is the only reason I still keep a notes app around. Conflict resolution will be the hard part.", daysAgo: 30 },
+      { author: "Elena", body: "This is the only reason I still keep a notes app around. Conflict resolution will be the hard part.", daysAgo: 30 },
     ],
   },
   {
@@ -72,13 +93,13 @@ const POSTS: SeedPost[] = [
     category: "FEATURE",
     appId: "web",
     status: "PLANNED",
-    authorName: "Ravi",
+    author: "Ravi",
     votes: 33,
     recentVotes: 4,
     createdDaysAgo: 80,
     comments: [
-      { authorName: "Kim", body: "Two-way would be even better — create a Slikk task from a Slack message.", daysAgo: 70 },
-      { authorName: "Slikk Team", body: "Planned! We're starting with notifications and will look at two-way sync after.", isTeam: true, daysAgo: 55 },
+      { author: "Kim", body: "Two-way would be even better — create a Slikk task from a Slack message.", daysAgo: 70 },
+      { author: "TEAM", body: "Planned! We're starting with notifications and will look at two-way sync after.", isTeam: true, daysAgo: 55 },
     ],
   },
   {
@@ -87,13 +108,13 @@ const POSTS: SeedPost[] = [
     category: "IMPROVEMENT",
     appId: "desktop",
     status: "SHIPPED",
-    authorName: "Ana",
+    author: "Ana",
     votes: 27,
     createdDaysAgo: 95,
     shippedDaysAgo: 9,
     comments: [
-      { authorName: "Slikk Team", body: "Shipped! Hit Cmd+K (Ctrl+K on Windows) anywhere, or press ? to see every shortcut.", isTeam: true, daysAgo: 9 },
-      { authorName: "Ana", body: "Just tried it — exactly what I wanted. Thank you!", daysAgo: 8 },
+      { author: "TEAM", body: "Shipped! Hit Cmd+K (Ctrl+K on Windows) anywhere, or press ? to see every shortcut.", isTeam: true, daysAgo: 9 },
+      { author: "Ana", body: "Just tried it — exactly what I wanted. Thank you!", daysAgo: 8 },
     ],
   },
   {
@@ -102,12 +123,12 @@ const POSTS: SeedPost[] = [
     category: "FEATURE",
     appId: null,
     status: "IN_PROGRESS",
-    authorName: "Diego",
+    author: "Diego",
     votes: 36,
     recentVotes: 6,
     createdDaysAgo: 70,
     comments: [
-      { authorName: "Fatima", body: "Please include 'complete to spawn next' AND 'fixed schedule' modes — they're different workflows.", daysAgo: 50 },
+      { author: "Fatima", body: "Please include 'complete to spawn next' AND 'fixed schedule' modes — they're different workflows.", daysAgo: 50 },
     ],
   },
   {
@@ -116,7 +137,7 @@ const POSTS: SeedPost[] = [
     category: "IMPROVEMENT",
     appId: "web",
     status: "UNDER_REVIEW",
-    authorName: "Lena",
+    author: "Lena",
     votes: 19,
     recentVotes: 11,
     createdDaysAgo: 8,
@@ -127,14 +148,14 @@ const POSTS: SeedPost[] = [
     category: "BUG",
     appId: "mobile",
     status: "IN_PROGRESS",
-    authorName: "Stefan",
+    author: "Stefan",
     votes: 22,
     recentVotes: 13,
     createdDaysAgo: 11,
     officialResponse:
       "We reproduced this — a sync loop triggered by large attachments. A fix is in QA and should ship in the next mobile release.",
     comments: [
-      { authorName: "Noor", body: "Same on Galaxy S24. Subscribing.", daysAgo: 10 },
+      { author: "Noor", body: "Same on Galaxy S24. Subscribing.", daysAgo: 10 },
     ],
   },
   {
@@ -143,12 +164,12 @@ const POSTS: SeedPost[] = [
     category: "BUG",
     appId: "web",
     status: "SHIPPED",
-    authorName: "Marta",
+    author: "Marta",
     votes: 12,
     createdDaysAgo: 40,
     shippedDaysAgo: 6,
     comments: [
-      { authorName: "Slikk Team", body: "Fixed and deployed — the calendar now respects your workspace's week-start day everywhere.", isTeam: true, daysAgo: 6 },
+      { author: "TEAM", body: "Fixed and deployed — the calendar now respects your workspace's week-start day everywhere.", isTeam: true, daysAgo: 6 },
     ],
   },
   {
@@ -157,12 +178,12 @@ const POSTS: SeedPost[] = [
     category: "FEATURE",
     appId: null,
     status: "PLANNED",
-    authorName: "Chris",
+    author: "Chris",
     votes: 29,
     recentVotes: 3,
     createdDaysAgo: 120,
     comments: [
-      { authorName: "Hana", body: "+1, and please offer API keys per workspace, not per user.", daysAgo: 100 },
+      { author: "Hana", body: "+1, and please offer API keys per workspace, not per user.", daysAgo: 100 },
     ],
   },
   {
@@ -171,7 +192,7 @@ const POSTS: SeedPost[] = [
     category: "FEATURE",
     appId: "desktop",
     status: "UNDER_REVIEW",
-    authorName: "Yuki",
+    author: "Yuki",
     votes: 15,
     recentVotes: 7,
     createdDaysAgo: 16,
@@ -182,7 +203,7 @@ const POSTS: SeedPost[] = [
     category: "IMPROVEMENT",
     appId: "web",
     status: "SHIPPED",
-    authorName: "Omar",
+    author: "Omar",
     votes: 24,
     createdDaysAgo: 110,
     shippedDaysAgo: 21,
@@ -193,7 +214,7 @@ const POSTS: SeedPost[] = [
     category: "FEATURE",
     appId: "web",
     status: "UNDER_REVIEW",
-    authorName: "Greta",
+    author: "Greta",
     votes: 9,
     recentVotes: 2,
     createdDaysAgo: 25,
@@ -204,7 +225,7 @@ const POSTS: SeedPost[] = [
     category: "FEATURE",
     appId: null,
     status: "CLOSED",
-    authorName: "Bo",
+    author: "Bo",
     votes: 4,
     createdDaysAgo: 140,
     officialResponse:
@@ -216,7 +237,7 @@ const POSTS: SeedPost[] = [
     category: "BUG",
     appId: "desktop",
     status: "UNDER_REVIEW",
-    authorName: "Pieter",
+    author: "Pieter",
     votes: 6,
     recentVotes: 5,
     createdDaysAgo: 4,
@@ -287,16 +308,51 @@ Big workspaces should see results in well under 100ms.`,
 ];
 
 async function main() {
+  await prisma.notification.deleteMany();
+  await prisma.subscription.deleteMany();
   await prisma.vote.deleteMany();
   await prisma.comment.deleteMany();
   await prisma.post.deleteMany();
   await prisma.changelogEntry.deleteMany();
+  await prisma.session.deleteMany();
+  await prisma.user.deleteMany();
 
-  let voterSeq = 0;
+  // --- Users -------------------------------------------------------------
+  const admin = await prisma.user.create({
+    data: {
+      email: ADMIN_EMAIL.toLowerCase(),
+      name: "Slikk Team",
+      passwordHash: hashPassword(ADMIN_PASSWORD),
+      isAdmin: true,
+    },
+  });
 
+  // One scrypt hash shared by all demo users keeps seeding fast.
+  const demoHash = hashPassword(DEMO_PASSWORD);
+  const users = new Map<string, string>(); // name -> id
+  for (const name of NAMED_USERS) {
+    const user = await prisma.user.create({
+      data: { email: `${name.toLowerCase()}@example.com`, name, passwordHash: demoHash },
+    });
+    users.set(name, user.id);
+  }
+  const fillerIds: string[] = [];
+  for (let i = 0; i < FILLER_VOTERS; i++) {
+    const user = await prisma.user.create({
+      data: { email: `voter${i}@example.com`, name: `Voter ${i}`, passwordHash: demoHash },
+    });
+    fillerIds.push(user.id);
+  }
+  // Pool of voters used to make vote counts real (named users first).
+  const voterPool = [...users.values(), ...fillerIds];
+
+  // --- Posts, votes, comments --------------------------------------------
+  let postIndex = 0;
   for (const p of POSTS) {
+    const authorId = users.get(p.author)!;
     const createdAt = daysAgo(p.createdDaysAgo);
-    const recent = Math.min(p.recentVotes ?? 0, p.votes);
+    const voteTotal = Math.min(p.votes, voterPool.length);
+    const recent = Math.min(p.recentVotes ?? 0, voteTotal);
 
     const post = await prisma.post.create({
       data: {
@@ -306,39 +362,44 @@ async function main() {
         appId: p.appId,
         status: p.status,
         pinned: p.pinned ?? false,
-        authorName: p.authorName,
-        authorId: `seed-author-${voterSeq}`,
+        authorId,
         officialResponse: p.officialResponse ?? null,
-        voteCount: p.votes,
+        voteCount: voteTotal,
         createdAt,
         shippedAt: p.shippedDaysAgo !== undefined ? daysAgo(p.shippedDaysAgo) : null,
       },
     });
 
-    const votes = Array.from({ length: p.votes }, (_, i) => ({
-      postId: post.id,
-      voterId: `seed-voter-${voterSeq}-${i}`,
-      // The first `recent` votes land inside the trending window, the rest are older.
-      createdAt: i < recent ? daysAgo(1 + (i % 12)) : daysAgo(20 + ((i * 7) % 80)),
-    }));
-    if (votes.length > 0) await prisma.vote.createMany({ data: votes });
+    // The author's own vote first, then fill from the pool — rotated per
+    // post so the same users don't vote on everything.
+    const offset = (postIndex++ * 7) % voterPool.length;
+    const rotated = [...voterPool.slice(offset), ...voterPool.slice(0, offset)];
+    const voters = [authorId, ...rotated.filter((id) => id !== authorId)].slice(0, voteTotal);
+    await prisma.vote.createMany({
+      data: voters.map((userId, i) => ({
+        postId: post.id,
+        userId,
+        // The first `recent` votes land inside the trending window, the rest are older.
+        createdAt: i < recent ? daysAgo(1 + (i % 12)) : daysAgo(20 + ((i * 7) % 80)),
+      })),
+    });
+
+    await prisma.subscription.create({ data: { postId: post.id, userId: authorId } });
 
     for (const c of p.comments ?? []) {
       await prisma.comment.create({
         data: {
           postId: post.id,
-          authorName: c.authorName,
-          authorId: c.isTeam ? TEAM_AUTHOR : `seed-commenter-${voterSeq}`,
+          authorId: c.isTeam ? admin.id : users.get(c.author)!,
           isTeam: c.isTeam ?? false,
           body: c.body,
           createdAt: daysAgo(c.daysAgo),
         },
       });
     }
-
-    voterSeq++;
   }
 
+  // --- Changelog -----------------------------------------------------------
   for (const e of CHANGELOG) {
     await prisma.changelogEntry.create({
       data: {
@@ -353,12 +414,14 @@ async function main() {
   }
 
   const counts = {
+    users: await prisma.user.count(),
     posts: await prisma.post.count(),
     votes: await prisma.vote.count(),
     comments: await prisma.comment.count(),
     changelog: await prisma.changelogEntry.count(),
   };
   console.log("Seeded:", counts);
+  console.log(`Admin account: ${ADMIN_EMAIL} / ${ADMIN_PASSWORD}`);
 }
 
 main()

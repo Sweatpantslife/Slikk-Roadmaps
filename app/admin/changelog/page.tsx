@@ -1,6 +1,7 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import type { Metadata } from "next";
-import { isAdmin } from "@/lib/admin";
+import { getCurrentUser } from "@/lib/auth";
 import { getChangelogEntries } from "@/lib/queries";
 import { parseLabels } from "@/lib/types";
 import { formatDate } from "@/lib/format";
@@ -9,17 +10,9 @@ import { AppChip, ChangelogLabelBadge } from "@/components/Badges";
 export const metadata: Metadata = { title: "Manage changelog" };
 
 export default async function AdminChangelogPage() {
-  if (!(await isAdmin())) {
-    return (
-      <p className="mt-12 text-center text-sm text-stone-500">
-        Not authorized —{" "}
-        <Link href="/admin" className="font-medium text-violet-700 underline">
-          sign in
-        </Link>{" "}
-        first.
-      </p>
-    );
-  }
+  const user = await getCurrentUser();
+  if (!user) redirect("/login?next=/admin/changelog");
+  if (!user.isAdmin) redirect("/admin");
 
   const entries = await getChangelogEntries(true);
 

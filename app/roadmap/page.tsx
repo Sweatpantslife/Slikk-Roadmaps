@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import type { Prisma } from "@prisma/client";
+import { getCurrentUser } from "@/lib/auth";
 import { getRoadmapPosts, getVotedPostIds } from "@/lib/queries";
 import { ROADMAP_COLUMNS, STATUS_META } from "@/lib/types";
 import { formatShortDate } from "@/lib/format";
@@ -14,13 +15,13 @@ export const metadata: Metadata = {
 
 type RoadmapPost = Prisma.PostGetPayload<{ include: { _count: { select: { comments: true } } } }>;
 
-function RoadmapCard({ post, voted }: { post: RoadmapPost; voted: boolean }) {
+function RoadmapCard({ post, voted, signedIn }: { post: RoadmapPost; voted: boolean; signedIn: boolean }) {
   return (
     <Link
       href={`/posts/${post.id}`}
       className="group flex items-start gap-3 rounded-xl border border-stone-200 bg-white p-3.5 transition-all hover:border-violet-200 hover:shadow-sm"
     >
-      <VoteButton postId={post.id} count={post.voteCount} voted={voted} size="sm" />
+      <VoteButton postId={post.id} count={post.voteCount} voted={voted} signedIn={signedIn} size="sm" />
       <div className="min-w-0 flex-1">
         <h3 className="text-sm font-medium leading-snug text-stone-900 group-hover:text-violet-700">{post.title}</h3>
         <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-stone-400">
@@ -47,7 +48,7 @@ function RoadmapCard({ post, voted }: { post: RoadmapPost; voted: boolean }) {
 }
 
 export default async function RoadmapPage() {
-  const { planned, inProgress, shipped } = await getRoadmapPosts();
+  const [{ planned, inProgress, shipped }, user] = await Promise.all([getRoadmapPosts(), getCurrentUser()]);
   const columns = [planned, inProgress, shipped];
   const allIds = columns.flat().map((p) => p.id);
   const votedIds = await getVotedPostIds(allIds);
@@ -80,7 +81,7 @@ export default async function RoadmapPage() {
               </header>
               <div className="space-y-2.5">
                 {posts.map((post) => (
-                  <RoadmapCard key={post.id} post={post} voted={votedIds.has(post.id)} />
+                  <RoadmapCard key={post.id} post={post} voted={votedIds.has(post.id)} signedIn={!!user} />
                 ))}
                 {posts.length === 0 && (
                   <p className="rounded-xl border border-dashed border-stone-300 px-4 py-8 text-center text-sm text-stone-400">

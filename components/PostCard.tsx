@@ -4,13 +4,13 @@ import { timeAgo } from "@/lib/format";
 import { AppChip, CategoryBadge, StatusBadge } from "@/components/Badges";
 import { VoteButton } from "@/components/VoteButton";
 
-export function PostCard({ post, voted }: { post: BoardPost; voted: boolean }) {
+export function PostCard({ post, voted, signedIn }: { post: BoardPost; voted: boolean; signedIn: boolean }) {
   return (
     <Link
       href={`/posts/${post.id}`}
       className="group flex items-start gap-4 rounded-xl border border-stone-200 bg-white p-4 transition-all hover:border-violet-200 hover:shadow-sm"
     >
-      <VoteButton postId={post.id} count={post.voteCount} voted={voted} />
+      <VoteButton postId={post.id} count={post.voteCount} voted={voted} signedIn={signedIn} />
 
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-3">
@@ -43,7 +43,7 @@ export function PostCard({ post, voted }: { post: BoardPost; voted: boolean }) {
           </span>
           <span>·</span>
           <span>
-            {post.authorName} · {timeAgo(post.createdAt)}
+            {post.author.name} · {timeAgo(post.createdAt)}
           </span>
         </div>
       </div>

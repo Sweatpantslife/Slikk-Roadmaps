@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { getVisitorId } from "@/lib/identity";
+import { getCurrentUser } from "@/lib/auth";
 import type { Category, Sort, Status } from "@/lib/types";
 import type { Prisma } from "@prisma/client";
 
@@ -13,7 +13,7 @@ export type BoardFilters = {
 };
 
 export type BoardPost = Prisma.PostGetPayload<{
-  include: { _count: { select: { comments: true } } };
+  include: { author: { select: { name: true } }; _count: { select: { comments: true } } };
 }> & { recentVotes: number };
 
 function boardWhere({ q, category, appId }: Omit<BoardFilters, "sort">): Prisma.PostWhereInput {
@@ -32,6 +32,7 @@ export async function getBoardPosts(filters: BoardFilters): Promise<BoardPost[]>
   const posts = await prisma.post.findMany({
     where: boardWhere(filters),
     include: {
+      author: { select: { name: true } },
       _count: { select: { comments: true, votes: { where: { createdAt: { gte: since } } } } },
     },
     orderBy:
@@ -68,12 +69,12 @@ export async function getCategoryCounts(filters: Omit<BoardFilters, "sort" | "ca
   return { total, byCategory: byCategory as Record<string, number> };
 }
 
-/** The set of post ids the current visitor has voted for (among the given ids). */
+/** The set of post ids the signed-in user has voted for (among the given ids). */
 export async function getVotedPostIds(postIds: string[]): Promise<Set<string>> {
-  const voterId = await getVisitorId();
-  if (!voterId || postIds.length === 0) return new Set();
+  const user = await getCurrentUser();
+  if (!user || postIds.length === 0) return new Set();
   const votes = await prisma.vote.findMany({
-    where: { voterId, postId: { in: postIds } },
+    where: { userId: user.id, postId: { in: postIds } },
     select: { postId: true },
   });
   return new Set(votes.map((v) => v.postId));
@@ -82,20 +83,21 @@ export async function getVotedPostIds(postIds: string[]): Promise<Set<string>> {
 const SHIPPED_LIMIT = 30;
 
 export async function getRoadmapPosts() {
+  const include = { _count: { select: { comments: true } } } as const;
   const [planned, inProgress, shipped] = await Promise.all([
     prisma.post.findMany({
       where: { status: "PLANNED" satisfies Status },
-      include: { _count: { select: { comments: true } } },
+      include,
       orderBy: [{ voteCount: "desc" }, { createdAt: "desc" }],
     }),
     prisma.post.findMany({
       where: { status: "IN_PROGRESS" satisfies Status },
-      include: { _count: { select: { comments: true } } },
+      include,
       orderBy: [{ voteCount: "desc" }, { createdAt: "desc" }],
     }),
     prisma.post.findMany({
       where: { status: "SHIPPED" satisfies Status },
-      include: { _count: { select: { comments: true } } },
+      include,
       orderBy: [{ shippedAt: "desc" }],
       take: SHIPPED_LIMIT,
     }),
@@ -107,9 +109,38 @@ export async function getPost(id: string) {
   return prisma.post.findUnique({
     where: { id },
     include: {
-      comments: { orderBy: { createdAt: "asc" } },
+      author: { select: { name: true } },
+      comments: { orderBy: { createdAt: "asc" }, include: { author: { select: { name: true } } } },
       _count: { select: { comments: true } },
     },
+  });
+}
+
+export async function isSubscribed(postId: string): Promise<boolean> {
+  const user = await getCurrentUser();
+  if (!user) return false;
+  const sub = await prisma.subscription.findUnique({
+    where: { postId_userId: { postId, userId: user.id } },
+    select: { id: true },
+  });
+  return !!sub;
+}
+
+export async function getUnreadNotificationCount(): Promise<number> {
+  const user = await getCurrentUser();
+  if (!user) return 0;
+  return prisma.notification.count({ where: { userId: user.id, readAt: null } });
+}
+
+const NOTIFICATIONS_LIMIT = 50;
+
+export async function getNotifications() {
+  const user = await getCurrentUser();
+  if (!user) return [];
+  return prisma.notification.findMany({
+    where: { userId: user.id },
+    orderBy: { createdAt: "desc" },
+    take: NOTIFICATIONS_LIMIT,
   });
 }
 

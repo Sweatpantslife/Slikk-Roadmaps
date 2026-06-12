@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { SITE } from "@/lib/config";
+import { ShortcutsButton } from "@/components/KeyboardShortcuts";
 
 export function Footer() {
   return (
@@ -8,11 +9,13 @@ export function Footer() {
         <p>
           © {new Date().getFullYear()} {SITE.name} · {SITE.tagline}
         </p>
-        <nav className="flex flex-wrap items-center gap-x-4 gap-y-1">
+        <nav className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
           <Link href="/" className="hover:text-stone-900">Board</Link>
           <Link href="/roadmap" className="hover:text-stone-900">Roadmap</Link>
           <Link href="/changelog" className="hover:text-stone-900">Changelog</Link>
-          <Link href="/admin" className="hover:text-stone-900">Team sign in</Link>
+          <Link href="/about" className="hover:text-stone-900">About</Link>
+          <Link href="/guidelines" className="hover:text-stone-900">Posting guidelines</Link>
+          <ShortcutsButton />
         </nav>
       </div>
     </footer>
