@@ -9,7 +9,7 @@ A self-hosted feedback board, public roadmap, and changelog for the Slikk apps �
 | **Changelog** (`/changelog`) | Markdown release notes with New / Improved / Fixed labels and per-app tags, on a timeline. |
 | **Notifications** (`/notifications`) | In-app updates for posts you follow — status changes, official responses, and new comments. |
 | **About / Guidelines** (`/about`, `/guidelines`) | How feedback flows to the team, and how to write posts that ship. |
-| **Admin** (`/admin`) | Team-only area: triage posts (status, pin, delete), post official team responses, comment with a team badge, and write/publish changelog entries (drafts supported). |
+| **Admin** (`/admin`) | Team-only area: triage posts (status, pin, delete), post official team responses, comment with a team badge, and write/publish changelog entries (drafts supported) — or auto-generate release notes from shipped posts. |
 
 ## Accounts — no guest posting
 
@@ -47,7 +47,33 @@ register your account and promote it with `make-admin`.
    add an official response. Subscribers are notified on every status change and team response.
 3. Anything Planned / In progress / Shipped appears on the public roadmap automatically (marking a post Shipped
    stamps its ship date).
-4. When it ships, write a changelog entry at `/admin/changelog` (markdown, with New / Improved / Fixed labels).
+4. When it ships, the release notes can write themselves — see [Automated release notes](#automated-release-notes) —
+   or write a changelog entry by hand at `/admin/changelog` (markdown, with New / Improved / Fixed labels).
+
+## Automated release notes
+
+Every post marked **Shipped** is tracked until a changelog entry covers it, so release notes are generated
+instead of written from scratch. Generation groups the outstanding shipped posts **per app** (cross-app posts
+get their own entry), buckets them into New / Improved / Fixed from their category, links each bullet back to
+the original post with its vote count, and saves one entry per app — as a draft to polish, or published directly.
+
+Three ways to trigger it:
+
+| Trigger | How |
+| --- | --- |
+| **Admin UI** | `/admin/changelog` shows how many shipped posts aren't covered yet — click **Generate drafts**, edit, publish. |
+| **CLI** | `npm run release-notes` creates drafts; `npm run release-notes -- --publish` publishes immediately. |
+| **HTTP (cron / CI)** | `POST /api/release-notes` with `Authorization: Bearer $RELEASE_NOTES_SECRET` (set the env var to enable the endpoint). Add `?publish=1` to publish without review. |
+
+For example, draft release notes every Friday afternoon:
+
+```cron
+0 17 * * 5 curl -fsS -X POST -H "Authorization: Bearer $RELEASE_NOTES_SECRET" https://feedback.example.com/api/release-notes
+```
+
+Each shipped post lands in exactly one entry, so re-running only picks up what shipped since the last run.
+The posts an entry covers are listed on its edit page in the admin, and deleting an entry returns its posts
+to the queue.
 
 ## Keyboard shortcuts
 
@@ -86,4 +112,5 @@ no code changes needed.
 | `npm run db:seed` | Reset and seed demo data (creates the admin account) |
 | `npm run setup` | `db:push` + `db:seed` |
 | `npm run make-admin -- <email>` | Promote a registered account to admin |
+| `npm run release-notes [-- --publish]` | Generate release notes from shipped posts (drafts by default) |
 | `npm run lint` | ESLint |

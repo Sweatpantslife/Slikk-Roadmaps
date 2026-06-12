@@ -17,6 +17,7 @@ import {
   verifyPassword,
 } from "@/lib/auth";
 import { getApp, SITE } from "@/lib/config";
+import { generateReleaseNotes } from "@/lib/release-notes";
 import { isCategory, isStatus, parseLabels, STATUS_META } from "@/lib/types";
 
 export type FormState = { error?: string } | undefined;
@@ -322,4 +323,12 @@ export async function deleteChangelogEntry(id: string): Promise<void> {
   await prisma.changelogEntry.delete({ where: { id } });
   revalidateAll();
   redirect("/admin/changelog");
+}
+
+/** One draft entry per app, covering every shipped post not yet in the changelog. */
+export async function generateReleaseNoteDrafts(): Promise<{ entries: number; posts: number }> {
+  await requireAdmin();
+  const entries = await generateReleaseNotes({ publish: false });
+  if (entries.length > 0) revalidateAll();
+  return { entries: entries.length, posts: entries.reduce((sum, e) => sum + e.postCount, 0) };
 }

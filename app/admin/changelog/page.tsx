@@ -3,9 +3,11 @@ import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { getCurrentUser } from "@/lib/auth";
 import { getChangelogEntries } from "@/lib/queries";
+import { getPendingGroups } from "@/lib/release-notes";
 import { parseLabels } from "@/lib/types";
 import { formatDate } from "@/lib/format";
 import { AppChip, ChangelogLabelBadge } from "@/components/Badges";
+import { GenerateReleaseNotes } from "@/components/admin/GenerateReleaseNotes";
 
 export const metadata: Metadata = { title: "Manage changelog" };
 
@@ -14,7 +16,7 @@ export default async function AdminChangelogPage() {
   if (!user) redirect("/login?next=/admin/changelog");
   if (!user.isAdmin) redirect("/admin");
 
-  const entries = await getChangelogEntries(true);
+  const [entries, pendingGroups] = await Promise.all([getChangelogEntries(true), getPendingGroups()]);
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -34,6 +36,10 @@ export default async function AdminChangelogPage() {
           New entry
         </Link>
       </section>
+
+      <GenerateReleaseNotes
+        pending={pendingGroups.map((g) => ({ appName: g.appName, postCount: g.posts.length }))}
+      />
 
       <div className="space-y-2.5">
         {entries.map((entry) => (

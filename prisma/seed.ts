@@ -48,6 +48,8 @@ type SeedPost = {
   recentVotes?: number;
   createdDaysAgo: number;
   shippedDaysAgo?: number;
+  /** Title of the CHANGELOG entry that covers this shipped post, if any. */
+  changelogTitle?: string;
   pinned?: boolean;
   officialResponse?: string;
   comments?: { author: string; body: string; isTeam?: boolean; daysAgo: number }[];
@@ -112,6 +114,7 @@ const POSTS: SeedPost[] = [
     votes: 27,
     createdDaysAgo: 95,
     shippedDaysAgo: 9,
+    changelogTitle: "Command palette & keyboard shortcuts",
     comments: [
       { author: "TEAM", body: "Shipped! Hit Cmd+K (Ctrl+K on Windows) anywhere, or press ? to see every shortcut.", isTeam: true, daysAgo: 9 },
       { author: "Ana", body: "Just tried it — exactly what I wanted. Thank you!", daysAgo: 8 },
@@ -168,6 +171,7 @@ const POSTS: SeedPost[] = [
     votes: 12,
     createdDaysAgo: 40,
     shippedDaysAgo: 6,
+    changelogTitle: "Calendar fixes & week-start setting",
     comments: [
       { author: "TEAM", body: "Fixed and deployed — the calendar now respects your workspace's week-start day everywhere.", isTeam: true, daysAgo: 6 },
     ],
@@ -207,6 +211,32 @@ const POSTS: SeedPost[] = [
     votes: 24,
     createdDaysAgo: 110,
     shippedDaysAgo: 21,
+    changelogTitle: "Search 2.0 — full-text and filters",
+  },
+  {
+    title: "Preview attachments without downloading",
+    body: "Tapping an attachment on mobile downloads it and bounces me to another app. An in-app preview for images and PDFs would keep me in the flow.",
+    category: "IMPROVEMENT",
+    appId: "mobile",
+    status: "SHIPPED",
+    author: "Hana",
+    votes: 17,
+    createdDaysAgo: 55,
+    shippedDaysAgo: 2,
+    comments: [
+      { author: "TEAM", body: "Live in the latest mobile release — images and PDFs now open instantly in-app.", isTeam: true, daysAgo: 2 },
+    ],
+  },
+  {
+    title: "Duplicate a project with all its tasks",
+    body: "We reuse the same project structure for every client. Let me duplicate a project including its tasks, sections, and assignees so it works like a template.",
+    category: "FEATURE",
+    appId: "web",
+    status: "SHIPPED",
+    author: "Kim",
+    votes: 21,
+    createdDaysAgo: 75,
+    shippedDaysAgo: 3,
   },
   {
     title: "Export workspace to CSV/JSON",
@@ -346,6 +376,22 @@ async function main() {
   // Pool of voters used to make vote counts real (named users first).
   const voterPool = [...users.values(), ...fillerIds];
 
+  // --- Changelog (before posts, so shipped posts can link to entries) -----
+  const entryIdByTitle = new Map<string, string>();
+  for (const e of CHANGELOG) {
+    const entry = await prisma.changelogEntry.create({
+      data: {
+        title: e.title,
+        body: e.body,
+        labels: e.labels,
+        appId: e.appId,
+        published: e.published ?? true,
+        publishedAt: daysAgo(e.publishedDaysAgo),
+      },
+    });
+    entryIdByTitle.set(e.title, entry.id);
+  }
+
   // --- Posts, votes, comments --------------------------------------------
   let postIndex = 0;
   for (const p of POSTS) {
@@ -367,6 +413,7 @@ async function main() {
         voteCount: voteTotal,
         createdAt,
         shippedAt: p.shippedDaysAgo !== undefined ? daysAgo(p.shippedDaysAgo) : null,
+        changelogEntryId: p.changelogTitle ? entryIdByTitle.get(p.changelogTitle) ?? null : null,
       },
     });
 
@@ -397,20 +444,6 @@ async function main() {
         },
       });
     }
-  }
-
-  // --- Changelog -----------------------------------------------------------
-  for (const e of CHANGELOG) {
-    await prisma.changelogEntry.create({
-      data: {
-        title: e.title,
-        body: e.body,
-        labels: e.labels,
-        appId: e.appId,
-        published: e.published ?? true,
-        publishedAt: daysAgo(e.publishedDaysAgo),
-      },
-    });
   }
 
   const counts = {
