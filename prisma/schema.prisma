@@ -1,0 +1,75 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// SQLite has no enums; string fields below hold the unions defined in lib/types.ts:
+//   Post.category — "FEATURE" | "IMPROVEMENT" | "BUG"
+//   Post.status   — "UNDER_REVIEW" | "PLANNED" | "IN_PROGRESS" | "SHIPPED" | "CLOSED"
+//   ChangelogEntry.labels — comma-separated "NEW" | "IMPROVED" | "FIXED"
+
+model Post {
+  id               String    @id @default(cuid())
+  title            String
+  body             String
+  category         String    @default("FEATURE")
+  appId            String?
+  status           String    @default("UNDER_REVIEW")
+  pinned           Boolean   @default(false)
+  authorName       String    @default("Anonymous")
+  authorId         String
+  officialResponse String?
+  voteCount        Int       @default(0)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  shippedAt        DateTime?
+
+  votes    Vote[]
+  comments Comment[]
+
+  @@index([status])
+  @@index([category])
+}
+
+model Vote {
+  id        String   @id @default(cuid())
+  postId    String
+  voterId   String
+  createdAt DateTime @default(now())
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, voterId])
+}
+
+model Comment {
+  id         String   @id @default(cuid())
+  postId     String
+  authorName String   @default("Anonymous")
+  authorId   String
+  isTeam     Boolean  @default(false)
+  body       String
+  createdAt  DateTime @default(now())
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([postId])
+}
+
+model ChangelogEntry {
+  id          String   @id @default(cuid())
+  title       String
+  body        String
+  labels      String   @default("NEW")
+  appId       String?
+  published   Boolean  @default(true)
+  publishedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([published, publishedAt])
+}
