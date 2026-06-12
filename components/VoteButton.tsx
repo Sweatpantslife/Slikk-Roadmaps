@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useOptimistic, useTransition } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { toggleVote } from "@/lib/actions";
 
@@ -13,7 +13,9 @@ type Props = {
 };
 
 export function VoteButton({ postId, count, voted, signedIn, size = "md" }: Props) {
-  const [state, setState] = useState({ count, voted });
+  // Derived from props, so revalidation keeps it fresh; optimistic updates
+  // apply instantly and revert automatically if the action fails.
+  const [state, setOptimistic] = useOptimistic({ count, voted });
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
   const pathname = usePathname();
@@ -29,20 +31,14 @@ export function VoteButton({ postId, count, voted, signedIn, size = "md" }: Prop
       return;
     }
 
-    const next = {
-      voted: !state.voted,
-      count: state.count + (state.voted ? -1 : 1),
-    };
-    setState(next);
     startTransition(async () => {
+      setOptimistic({
+        voted: !state.voted,
+        count: state.count + (state.voted ? -1 : 1),
+      });
       const result = await toggleVote(postId);
-      if ("error" in result) {
-        setState(state); // roll back optimistic update
-        if (result.error === "UNAUTHENTICATED") {
-          router.push(`/login?next=${encodeURIComponent(pathname)}`);
-        }
-      } else {
-        setState(result);
+      if ("error" in result && result.error === "UNAUTHENTICATED") {
+        router.push(`/login?next=${encodeURIComponent(pathname)}`);
       }
     });
   }

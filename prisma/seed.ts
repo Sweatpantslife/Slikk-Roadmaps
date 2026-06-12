@@ -347,6 +347,7 @@ async function main() {
   const voterPool = [...users.values(), ...fillerIds];
 
   // --- Posts, votes, comments --------------------------------------------
+  let postIndex = 0;
   for (const p of POSTS) {
     const authorId = users.get(p.author)!;
     const createdAt = daysAgo(p.createdDaysAgo);
@@ -369,8 +370,11 @@ async function main() {
       },
     });
 
-    // The author's own vote first, then fill from the pool.
-    const voters = [authorId, ...voterPool.filter((id) => id !== authorId)].slice(0, voteTotal);
+    // The author's own vote first, then fill from the pool — rotated per
+    // post so the same users don't vote on everything.
+    const offset = (postIndex++ * 7) % voterPool.length;
+    const rotated = [...voterPool.slice(offset), ...voterPool.slice(0, offset)];
+    const voters = [authorId, ...rotated.filter((id) => id !== authorId)].slice(0, voteTotal);
     await prisma.vote.createMany({
       data: voters.map((userId, i) => ({
         postId: post.id,

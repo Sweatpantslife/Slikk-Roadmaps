@@ -25,6 +25,17 @@ export function verifyPassword(password: string, stored: string): boolean {
   return candidate.length === expected.length && timingSafeEqual(candidate, expected);
 }
 
+let dummyHash: string | undefined;
+
+/**
+ * A hash to verify against when the email doesn't exist, so login response
+ * timing doesn't reveal which emails are registered.
+ */
+export function getDummyPasswordHash(): string {
+  dummyHash ??= hashPassword("timing-equalization-dummy");
+  return dummyHash;
+}
+
 // ---------------------------------------------------------------------------
 // Sessions (DB-backed, httpOnly cookie)
 // ---------------------------------------------------------------------------
@@ -37,6 +48,7 @@ export async function startSession(userId: string): Promise<void> {
   const store = await cookies();
   store.set(SESSION_COOKIE, token, {
     httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     maxAge: SESSION_DAYS * 24 * 60 * 60,
     path: "/",
@@ -93,6 +105,8 @@ export function isValidEmail(email: string): boolean {
 
 /** Only allow same-site redirect targets like "/posts/abc". */
 export function safeNextPath(next: string | null | undefined): string {
-  if (next && next.startsWith("/") && !next.startsWith("//")) return next;
+  // Reject "//host" and "/\host" — browsers normalize backslashes, turning
+  // either into a protocol-relative redirect to another origin.
+  if (next && /^\/(?![/\\])/.test(next)) return next;
   return "/";
 }

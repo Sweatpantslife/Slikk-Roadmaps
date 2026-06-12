@@ -99,7 +99,10 @@ export function KeyboardShortcuts() {
     }
 
     document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      if (gTimer.current) clearTimeout(gTimer.current);
+    };
   }, [router, pathname]);
 
   if (!open) return null;

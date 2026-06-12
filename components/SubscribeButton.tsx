@@ -1,34 +1,24 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useOptimistic, useTransition } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { toggleSubscription } from "@/lib/actions";
 
 export function SubscribeButton({ postId, subscribed }: { postId: string; subscribed: boolean }) {
-  const [isSubscribed, setIsSubscribed] = useState(subscribed);
+  // Derived from props, so server-side auto-subscribes (commenting, voting)
+  // show up after revalidation; optimistic toggles revert on failure.
+  const [isSubscribed, setOptimistic] = useOptimistic(subscribed);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
   const pathname = usePathname();
 
-  // Commenting/voting auto-subscribes server-side; pick up the fresh value
-  // when the page revalidates.
-  useEffect(() => {
-    setIsSubscribed(subscribed);
-  }, [subscribed]);
-
   function onClick() {
     if (isPending) return;
-    const next = !isSubscribed;
-    setIsSubscribed(next);
     startTransition(async () => {
+      setOptimistic(!isSubscribed);
       const result = await toggleSubscription(postId);
-      if ("error" in result) {
-        setIsSubscribed(!next);
-        if (result.error === "UNAUTHENTICATED") {
-          router.push(`/login?next=${encodeURIComponent(pathname)}`);
-        }
-      } else {
-        setIsSubscribed(result.subscribed);
+      if ("error" in result && result.error === "UNAUTHENTICATED") {
+        router.push(`/login?next=${encodeURIComponent(pathname)}`);
       }
     });
   }

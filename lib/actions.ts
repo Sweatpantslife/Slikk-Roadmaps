@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db";
 import {
   endSession,
   getCurrentUser,
+  getDummyPasswordHash,
   hashPassword,
   isValidEmail,
   MIN_PASSWORD_LENGTH,
@@ -58,7 +59,10 @@ export async function loginUser(_prev: FormState, formData: FormData): Promise<F
   const next = safeNextPath(String(formData.get("next") ?? ""));
 
   const user = await prisma.user.findUnique({ where: { email } });
-  if (!user || !verifyPassword(password, user.passwordHash)) {
+  // Verify against a dummy hash for unknown emails so response timing
+  // doesn't reveal which addresses are registered.
+  const valid = verifyPassword(password, user?.passwordHash ?? getDummyPasswordHash());
+  if (!user || !valid) {
     return { error: "Incorrect email or password." };
   }
 

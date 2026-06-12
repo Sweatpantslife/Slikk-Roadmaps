@@ -9,11 +9,10 @@ import { ChangelogEditor } from "@/components/admin/ChangelogEditor";
 export const metadata: Metadata = { title: "Edit changelog entry" };
 
 export default async function EditChangelogEntryPage({ params }: { params: Promise<{ id: string }> }) {
-  const user = await getCurrentUser();
-  if (!user) redirect("/login?next=/admin/changelog");
-  if (!user.isAdmin) redirect("/admin");
-
   const { id } = await params;
+  const user = await getCurrentUser();
+  if (!user) redirect(`/login?next=/admin/changelog/${id}`);
+  if (!user.isAdmin) redirect("/admin");
   const entry = await prisma.changelogEntry.findUnique({ where: { id } });
   if (!entry) notFound();
 
