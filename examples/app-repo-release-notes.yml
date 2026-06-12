@@ -1,0 +1,84 @@
+# Release notes, written by an AI agent in CI.
+#
+# Copy this file into each Slikk app repository as
+# .github/workflows/release-notes.yml and set APP_ID below. On every release
+# tag, Claude Code reads what changed since the previous tag, writes
+# customer-facing release notes, and submits them to the feedback hub as a
+# DRAFT changelog entry — review and publish at /admin/changelog.
+#
+# Repository secrets required:
+#   ANTHROPIC_API_KEY     — for the Claude Code action
+#   FEEDBACK_HUB_URL      — e.g. https://feedback.slikk.app (no trailing slash)
+#   RELEASE_NOTES_SECRET  — same value as the hub's RELEASE_NOTES_SECRET env var
+#
+# Closing the loop with the feedback board: commits (or squashed PRs) that
+# resolve a feedback post should carry a git trailer with the post's id or URL:
+#
+#   Fix sync loop on large attachments
+#
+#   Fixes-Feedback: cmqbfh8mo00c97dlejezikta0
+#
+# The hub marks those posts Shipped when the notes are ingested — subscribers
+# are notified, the roadmap updates, and the posts are covered by this entry.
+
+name: Release notes to feedback hub
+
+on:
+  push:
+    tags: ["v*"]
+
+env:
+  APP_ID: web # which Slikk app this repo is: web | mobile | desktop
+
+permissions:
+  contents: read
+
+jobs:
+  release-notes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history, so the range against the previous tag resolves
+
+      - name: Collect commits since the previous tag
+        run: |
+          PREV=$(git describe --tags --abbrev=0 "${GITHUB_REF_NAME}^" 2>/dev/null || true)
+          git log --no-merges --pretty='%s%n%b---' ${PREV:+$PREV..}$GITHUB_REF_NAME > /tmp/changes.log
+          echo "Commits in range ${PREV:-<repo start>}..$GITHUB_REF_NAME:"
+          grep -c -- '---' /tmp/changes.log || true
+
+      - name: Write and submit release notes
+        uses: anthropics/claude-code-action@v1
+        env:
+          FEEDBACK_HUB_URL: ${{ secrets.FEEDBACK_HUB_URL }}
+          RELEASE_NOTES_SECRET: ${{ secrets.RELEASE_NOTES_SECRET }}
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_args: |
+            --allowedTools "Read,Write,Bash(git log:*),Bash(git diff:*),Bash(git show:*),Bash(curl:*)" --max-turns 25
+          prompt: |
+            You are preparing customer-facing release notes for the "${{ env.APP_ID }}" app,
+            release ${{ github.ref_name }}.
+
+            1. Read /tmp/changes.log — the commits in this release. When a commit message
+               alone is unclear, inspect the change with `git show` or `git diff`.
+            2. Write markdown release notes for end users:
+               - Sections in this order, each only when non-empty: "### New", "### Improved", "### Fixed".
+               - One bullet per user-visible change, phrased as the benefit to the user.
+               - Skip refactors, chores, CI, dependency bumps, and anything users can't see.
+            3. Write a payload.json with these fields, then submit it:
+               - appId: "${{ env.APP_ID }}"
+               - version: "${{ github.ref_name }}"
+               - body: your markdown release notes
+               - labels: the subset of ["NEW","IMPROVED","FIXED"] matching your sections
+               - gitLog: the verbatim contents of /tmp/changes.log (the hub ships feedback
+                 posts referenced by "Fixes-Feedback:" trailers from it)
+
+               curl -fsS -X POST \
+                 -H "Authorization: Bearer $RELEASE_NOTES_SECRET" \
+                 -H "Content-Type: application/json" \
+                 --data @payload.json \
+                 "$FEEDBACK_HUB_URL/api/release-notes/ingest"
+
+            Finish by printing the hub's JSON response.

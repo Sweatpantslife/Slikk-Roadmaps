@@ -1,5 +1,5 @@
-import { createHash, timingSafeEqual } from "crypto";
 import { revalidatePath } from "next/cache";
+import { isAuthorizedBearer } from "@/lib/api-auth";
 import { generateReleaseNotes } from "@/lib/release-notes";
 
 /**
@@ -11,14 +11,6 @@ import { generateReleaseNotes } from "@/lib/release-notes";
  *   curl -X POST … "https://your-host/api/release-notes?publish=1"
  */
 
-function isAuthorized(request: Request, secret: string): boolean {
-  const token = (request.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
-  // Hash both sides so timingSafeEqual gets equal-length buffers.
-  const a = createHash("sha256").update(token).digest();
-  const b = createHash("sha256").update(secret).digest();
-  return timingSafeEqual(a, b);
-}
-
 export async function POST(request: Request) {
   const secret = process.env.RELEASE_NOTES_SECRET;
   if (!secret) {
@@ -27,7 +19,7 @@ export async function POST(request: Request) {
       { status: 503 },
     );
   }
-  if (!isAuthorized(request, secret)) {
+  if (!isAuthorizedBearer(request, secret)) {
     return Response.json({ error: "Invalid or missing bearer token." }, { status: 401 });
   }
 
