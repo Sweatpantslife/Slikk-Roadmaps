@@ -55,15 +55,20 @@ model Post {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
   shippedAt        DateTime?
+  // Set when the shipped post is covered by release notes, so generation
+  // includes each post exactly once. Deleting the entry re-queues the post.
+  changelogEntryId String?
 
-  author        User           @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  votes         Vote[]
-  comments      Comment[]
-  subscriptions Subscription[]
-  notifications Notification[]
+  author         User            @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  changelogEntry ChangelogEntry? @relation(fields: [changelogEntryId], references: [id], onDelete: SetNull)
+  votes          Vote[]
+  comments       Comment[]
+  subscriptions  Subscription[]
+  notifications  Notification[]
 
   @@index([status])
   @@index([category])
+  @@index([changelogEntryId])
 }
 
 model Vote {
@@ -129,6 +134,9 @@ model ChangelogEntry {
   publishedAt DateTime @default(now())
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  // Shipped posts this entry covers (set by release-notes generation).
+  posts Post[]
 
   @@index([published, publishedAt])
 }
