@@ -75,6 +75,38 @@ Each shipped post lands in exactly one entry, so re-running only picks up what s
 The posts an entry covers are listed on its edit page in the admin, and deleting an entry returns its posts
 to the queue.
 
+### From your app repos — git + AI agents
+
+Not everything starts on the feedback board: bug fixes, performance work, and dev-initiated features ship
+straight from the app repos. An AI agent in each repo's CI can write those release notes and submit them to
+the hub:
+
+1. On every release tag, a workflow collects the commits since the previous tag.
+2. [Claude Code's GitHub Action](https://github.com/anthropics/claude-code-action) reads them (and the
+   diffs, when messages are terse), writes customer-facing New / Improved / Fixed markdown, and skips the
+   refactors, chores, and CI noise.
+3. It POSTs to `POST /api/release-notes/ingest` (same `RELEASE_NOTES_SECRET` bearer auth), which saves a
+   **draft** entry for that app — reviewed and published at `/admin/changelog` like any other.
+
+Copy [`examples/app-repo-release-notes.yml`](examples/app-repo-release-notes.yml) into each app repo as
+`.github/workflows/release-notes.yml`, set its `APP_ID`, and add the `ANTHROPIC_API_KEY`,
+`FEEDBACK_HUB_URL`, and `RELEASE_NOTES_SECRET` repository secrets.
+
+**Closing the loop from commits:** a commit (or squashed PR) whose message carries a `Fixes-Feedback:`
+trailer automatically marks that feedback post **Shipped** when the notes are ingested — subscribers are
+notified, the roadmap updates, and the post is covered by the new entry, so developers never need to
+touch the admin UI:
+
+```
+Fix sync loop on large attachments
+
+Fixes-Feedback: cmqbfh8mo00c97dlejezikta0
+```
+
+The id is the last segment of the post's URL (a full post URL works too). The ingest payload is documented
+in [`app/api/release-notes/ingest/route.ts`](app/api/release-notes/ingest/route.ts); any CI system or agent
+that can `curl` can use it — Claude Code is just the turnkey option.
+
 ## Keyboard shortcuts
 
 Press `?` anywhere for the overlay: `c` create a post, `/` search, `g` `b`/`r`/`c`/`n` to jump to

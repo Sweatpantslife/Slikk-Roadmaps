@@ -9,6 +9,10 @@
  *
  * Triggered from the admin UI (/admin/changelog), the CLI
  * (`npm run release-notes`), or POST /api/release-notes for cron jobs.
+ *
+ * App repos can also submit agent-written notes directly via
+ * POST /api/release-notes/ingest — commits carrying a `Fixes-Feedback:`
+ * trailer auto-ship the referenced feedback posts (see shipCoveredPosts).
  */
 
 import { prisma } from "@/lib/db";
@@ -144,4 +148,71 @@ export async function generateReleaseNotes(
     postCount: groups[i].posts.length,
     published: entry.published,
   }));
+}
+
+/**
+ * Post ids referenced by `Fixes-Feedback:` trailers in commit messages.
+ * Accepts a bare id or a full post URL ("…/posts/<id>").
+ */
+export function parseFeedbackTrailers(text: string): string[] {
+  const ids = [...text.matchAll(/^\s*Fixes-Feedback:\s*(?:\S*\/posts\/)?([A-Za-z0-9]+)\/?\s*$/gim)].map(
+    (m) => m[1],
+  );
+  return [...new Set(ids)];
+}
+
+export type ShipResult = {
+  id: string;
+  title?: string;
+  result: "shipped" | "already_shipped" | "not_found";
+};
+
+/**
+ * Marks posts as Shipped because a release covering them went out: stamps the
+ * ship date, notifies subscribers (matching the admin triage flow), and
+ * attaches each post to the given changelog entry unless another entry
+ * already covers it.
+ */
+export async function shipCoveredPosts(postIds: string[], entryId: string): Promise<ShipResult[]> {
+  const results: ShipResult[] = [];
+  for (const id of [...new Set(postIds)]) {
+    const post = await prisma.post.findUnique({
+      where: { id },
+      select: { id: true, title: true, status: true, changelogEntryId: true },
+    });
+    if (!post) {
+      results.push({ id, result: "not_found" });
+      continue;
+    }
+
+    const alreadyShipped = post.status === "SHIPPED";
+    await prisma.post.update({
+      where: { id },
+      data: {
+        status: "SHIPPED",
+        ...(alreadyShipped ? {} : { shippedAt: new Date() }),
+        changelogEntryId: post.changelogEntryId ?? entryId,
+      },
+    });
+
+    if (!alreadyShipped) {
+      const subs = await prisma.subscription.findMany({
+        where: { postId: id },
+        select: { userId: true },
+      });
+      if (subs.length > 0) {
+        await prisma.notification.createMany({
+          data: subs.map((s) => ({
+            userId: s.userId,
+            postId: id,
+            type: "STATUS_CHANGE",
+            message: `“${post.title}” moved to Shipped`,
+          })),
+        });
+      }
+    }
+
+    results.push({ id, title: post.title, result: alreadyShipped ? "already_shipped" : "shipped" });
+  }
+  return results;
 }
