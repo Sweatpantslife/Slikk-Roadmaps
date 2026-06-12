@@ -1,24 +1,33 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { toggleVote } from "@/lib/actions";
 
 type Props = {
   postId: string;
   count: number;
   voted: boolean;
+  signedIn: boolean;
   size?: "md" | "sm";
 };
 
-export function VoteButton({ postId, count, voted, size = "md" }: Props) {
+export function VoteButton({ postId, count, voted, signedIn, size = "md" }: Props) {
   const [state, setState] = useState({ count, voted });
   const [isPending, startTransition] = useTransition();
+  const router = useRouter();
+  const pathname = usePathname();
 
   function onClick(e: React.MouseEvent) {
     // Cards are wrapped in links; voting shouldn't navigate.
     e.preventDefault();
     e.stopPropagation();
     if (isPending) return;
+
+    if (!signedIn) {
+      router.push(`/login?next=${encodeURIComponent(pathname)}`);
+      return;
+    }
 
     const next = {
       voted: !state.voted,
@@ -29,6 +38,9 @@ export function VoteButton({ postId, count, voted, size = "md" }: Props) {
       const result = await toggleVote(postId);
       if ("error" in result) {
         setState(state); // roll back optimistic update
+        if (result.error === "UNAUTHENTICATED") {
+          router.push(`/login?next=${encodeURIComponent(pathname)}`);
+        }
       } else {
         setState(result);
       }

@@ -18,6 +18,7 @@ export const SITE = {
   heroTitle: "What should we build next?",
   heroSubtitle:
     "Suggest new features, request improvements, and vote on the ideas you want most. Search before you post — every request is read by the team, and we build the ones you upvote.",
+  contactEmail: "feedback@slikk.app",
 } as const;
 
 export const APPS: AppInfo[] = [

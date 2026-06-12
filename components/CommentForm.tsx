@@ -3,7 +3,7 @@
 import { useActionState, useEffect, useRef } from "react";
 import { addComment, type FormState } from "@/lib/actions";
 
-export function CommentForm({ postId, defaultName }: { postId: string; defaultName: string }) {
+export function CommentForm({ postId }: { postId: string }) {
   const action = addComment.bind(null, postId);
   const [state, formAction, isPending] = useActionState<FormState, FormData>(action, undefined);
   const formRef = useRef<HTMLFormElement>(null);
@@ -27,15 +27,7 @@ export function CommentForm({ postId, defaultName }: { postId: string; defaultNa
         placeholder="Share more context, use cases, or workarounds…"
         className="w-full resize-y rounded-xl border border-stone-200 bg-white px-3.5 py-2.5 text-sm outline-none transition placeholder:text-stone-400 focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
       />
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <input
-          name="authorName"
-          defaultValue={defaultName}
-          maxLength={50}
-          placeholder="Your name (optional)"
-          aria-label="Your name"
-          className="w-48 rounded-xl border border-stone-200 bg-white px-3.5 py-2 text-sm outline-none transition placeholder:text-stone-400 focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
-        />
+      <div className="flex justify-end">
         <button
           type="submit"
           disabled={isPending}

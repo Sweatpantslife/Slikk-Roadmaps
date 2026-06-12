@@ -1,7 +1,6 @@
-import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import type { Metadata } from "next";
-import { isAdmin } from "@/lib/admin";
+import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { parseLabels } from "@/lib/types";
 import { toDateInputValue } from "@/lib/format";
@@ -10,17 +9,9 @@ import { ChangelogEditor } from "@/components/admin/ChangelogEditor";
 export const metadata: Metadata = { title: "Edit changelog entry" };
 
 export default async function EditChangelogEntryPage({ params }: { params: Promise<{ id: string }> }) {
-  if (!(await isAdmin())) {
-    return (
-      <p className="mt-12 text-center text-sm text-stone-500">
-        Not authorized —{" "}
-        <Link href="/admin" className="font-medium text-violet-700 underline">
-          sign in
-        </Link>{" "}
-        first.
-      </p>
-    );
-  }
+  const user = await getCurrentUser();
+  if (!user) redirect("/login?next=/admin/changelog");
+  if (!user.isAdmin) redirect("/admin");
 
   const { id } = await params;
   const entry = await prisma.changelogEntry.findUnique({ where: { id } });

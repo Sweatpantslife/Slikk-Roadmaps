@@ -11,6 +11,35 @@ datasource db {
 //   Post.category — "FEATURE" | "IMPROVEMENT" | "BUG"
 //   Post.status   — "UNDER_REVIEW" | "PLANNED" | "IN_PROGRESS" | "SHIPPED" | "CLOSED"
 //   ChangelogEntry.labels — comma-separated "NEW" | "IMPROVED" | "FIXED"
+//   Notification.type — "STATUS_CHANGE" | "OFFICIAL_RESPONSE" | "NEW_COMMENT"
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  isAdmin      Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  sessions      Session[]
+  posts         Post[]
+  comments      Comment[]
+  votes         Vote[]
+  subscriptions Subscription[]
+  notifications Notification[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
 
 model Post {
   id               String    @id @default(cuid())
@@ -20,7 +49,6 @@ model Post {
   appId            String?
   status           String    @default("UNDER_REVIEW")
   pinned           Boolean   @default(false)
-  authorName       String    @default("Anonymous")
   authorId         String
   officialResponse String?
   voteCount        Int       @default(0)
@@ -28,8 +56,11 @@ model Post {
   updatedAt        DateTime  @updatedAt
   shippedAt        DateTime?
 
-  votes    Vote[]
-  comments Comment[]
+  author        User           @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  votes         Vote[]
+  comments      Comment[]
+  subscriptions Subscription[]
+  notifications Notification[]
 
   @@index([status])
   @@index([category])
@@ -38,26 +69,54 @@ model Post {
 model Vote {
   id        String   @id @default(cuid())
   postId    String
-  voterId   String
+  userId    String
   createdAt DateTime @default(now())
 
   post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([postId, voterId])
+  @@unique([postId, userId])
 }
 
 model Comment {
-  id         String   @id @default(cuid())
-  postId     String
-  authorName String   @default("Anonymous")
-  authorId   String
-  isTeam     Boolean  @default(false)
-  body       String
-  createdAt  DateTime @default(now())
+  id        String   @id @default(cuid())
+  postId    String
+  authorId  String
+  isTeam    Boolean  @default(false)
+  body      String
+  createdAt DateTime @default(now())
 
-  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  post   Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author User @relation(fields: [authorId], references: [id], onDelete: Cascade)
 
   @@index([postId])
+}
+
+model Subscription {
+  id        String   @id @default(cuid())
+  postId    String
+  userId    String
+  createdAt DateTime @default(now())
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  postId    String?
+  type      String
+  message   String
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post Post? @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt])
 }
 
 model ChangelogEntry {

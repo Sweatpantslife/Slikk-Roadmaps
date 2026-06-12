@@ -1,14 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { isAdmin } from "@/lib/admin";
-import { getDisplayName } from "@/lib/identity";
-import { getPost, getVotedPostIds } from "@/lib/queries";
+import { getCurrentUser } from "@/lib/auth";
+import { getPost, getVotedPostIds, isSubscribed } from "@/lib/queries";
 import { formatDate, timeAgo } from "@/lib/format";
 import { SITE } from "@/lib/config";
 import { AppChip, CategoryBadge, StatusBadge } from "@/components/Badges";
 import { CommentForm } from "@/components/CommentForm";
 import { Markdown } from "@/components/Markdown";
+import { SubscribeButton } from "@/components/SubscribeButton";
 import { VoteButton } from "@/components/VoteButton";
 import { DeleteCommentButton } from "@/components/admin/DeleteCommentButton";
 import { PostAdminPanel } from "@/components/admin/PostAdminPanel";
@@ -22,9 +22,10 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
 
 export default async function PostPage({ params }: { params: Params }) {
   const { id } = await params;
-  const [post, admin, defaultName] = await Promise.all([getPost(id), isAdmin(), getDisplayName()]);
+  const [post, user] = await Promise.all([getPost(id), getCurrentUser()]);
   if (!post) notFound();
-  const votedIds = await getVotedPostIds([post.id]);
+  const [votedIds, subscribed] = await Promise.all([getVotedPostIds([post.id]), isSubscribed(post.id)]);
+  const admin = !!user?.isAdmin;
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -40,7 +41,7 @@ export default async function PostPage({ params }: { params: Params }) {
 
       <article className="mt-4 rounded-2xl border border-stone-200 bg-white p-6">
         <div className="flex items-start gap-4">
-          <VoteButton postId={post.id} count={post.voteCount} voted={votedIds.has(post.id)} />
+          <VoteButton postId={post.id} count={post.voteCount} voted={votedIds.has(post.id)} signedIn={!!user} />
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <StatusBadge status={post.status} />
@@ -53,10 +54,13 @@ export default async function PostPage({ params }: { params: Params }) {
               )}
             </div>
             <h1 className="mt-2 text-xl font-semibold leading-snug text-stone-900 sm:text-2xl">{post.title}</h1>
-            <p className="mt-1 text-sm text-stone-400">
-              {post.authorName} · {timeAgo(post.createdAt)}
-              {post.status === "SHIPPED" && post.shippedAt && <> · shipped {formatDate(post.shippedAt)}</>}
-            </p>
+            <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
+              <p className="text-sm text-stone-400">
+                {post.author.name} · {timeAgo(post.createdAt)}
+                {post.status === "SHIPPED" && post.shippedAt && <> · shipped {formatDate(post.shippedAt)}</>}
+              </p>
+              {user && <SubscribeButton postId={post.id} subscribed={subscribed} />}
+            </div>
           </div>
         </div>
 
@@ -96,7 +100,7 @@ export default async function PostPage({ params }: { params: Params }) {
             <div key={comment.id} className="rounded-xl border border-stone-200 bg-white p-4">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-sm font-medium text-stone-900">
-                  {comment.authorName}
+                  {comment.author.name}
                   {comment.isTeam && (
                     <span className="ml-2 rounded-full bg-violet-600 px-2 py-0.5 text-[11px] font-semibold text-white">
                       {SITE.name} team
@@ -111,10 +115,33 @@ export default async function PostPage({ params }: { params: Params }) {
           ))}
         </div>
 
-        <div className="mt-6 rounded-xl border border-stone-200 bg-white p-4">
-          <h3 className="mb-3 text-sm font-semibold text-stone-900">Add a comment</h3>
-          <CommentForm postId={post.id} defaultName={defaultName} />
-        </div>
+        {user ? (
+          <div className="mt-6 rounded-xl border border-stone-200 bg-white p-4">
+            <h3 className="mb-3 text-sm font-semibold text-stone-900">
+              Add a comment <span className="font-normal text-stone-400">as {user.name}</span>
+            </h3>
+            <CommentForm postId={post.id} />
+          </div>
+        ) : (
+          <div className="mt-6 rounded-xl border border-dashed border-stone-300 bg-white p-6 text-center">
+            <p className="text-sm font-medium text-stone-700">Join the discussion</p>
+            <p className="mt-1 text-sm text-stone-500">Sign in to comment and vote on this post.</p>
+            <div className="mt-4 flex justify-center gap-2">
+              <Link
+                href={`/login?next=/posts/${post.id}`}
+                className="rounded-xl border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50"
+              >
+                Sign in
+              </Link>
+              <Link
+                href={`/register?next=/posts/${post.id}`}
+                className="rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700"
+              >
+                Create account
+              </Link>
+            </div>
+          </div>
+        )}
       </section>
     </div>
   );

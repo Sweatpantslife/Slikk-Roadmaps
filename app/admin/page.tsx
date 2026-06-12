@@ -1,34 +1,28 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import type { Metadata } from "next";
-import { isAdmin } from "@/lib/admin";
+import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getApp } from "@/lib/config";
 import { CATEGORY_META, STATUS_META, isCategory, isStatus } from "@/lib/types";
-import { LoginForm } from "@/components/admin/LoginForm";
-import { LogoutButton } from "@/components/admin/LogoutButton";
 import { TriageRow } from "@/components/admin/TriageRow";
 
 export const metadata: Metadata = { title: "Admin" };
 
 export default async function AdminPage() {
-  if (!(await isAdmin())) {
+  const user = await getCurrentUser();
+  if (!user) redirect("/login?next=/admin");
+  if (!user.isAdmin) {
     return (
-      <div className="mx-auto mt-12 max-w-sm">
-        <div className="rounded-2xl border border-stone-200 bg-white p-6">
-          <h1 className="text-lg font-semibold text-stone-900">Team sign in</h1>
-          <p className="mt-1 text-sm text-stone-500">
-            Enter the team password to triage feedback and publish changelog entries.
-          </p>
-          <div className="mt-5">
-            <LoginForm />
-          </div>
-        </div>
-        {!process.env.ADMIN_PASSWORD && (
-          <p className="mt-4 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-700 ring-1 ring-amber-200">
-            No <code className="font-mono">ADMIN_PASSWORD</code> is configured — set it in your environment to enable
-            admin access.
-          </p>
-        )}
+      <div className="mx-auto mt-12 max-w-md rounded-2xl border border-stone-200 bg-white p-6 text-center">
+        <h1 className="text-lg font-semibold text-stone-900">Team members only</h1>
+        <p className="mt-1 text-sm text-stone-500">
+          Your account ({user.email}) doesn’t have admin access. Ask a teammate to promote you with{" "}
+          <code className="rounded bg-stone-100 px-1.5 py-0.5 font-mono text-xs">npm run make-admin -- {user.email}</code>
+        </p>
+        <Link href="/" className="mt-4 inline-block text-sm font-medium text-violet-700 hover:underline">
+          Back to the board
+        </Link>
       </div>
     );
   }
@@ -50,15 +44,12 @@ export default async function AdminPage() {
           <h1 className="text-2xl font-semibold tracking-tight text-stone-900">Admin</h1>
           <p className="mt-1 text-sm text-stone-500">Triage feedback, update statuses, and publish the changelog.</p>
         </div>
-        <div className="flex items-center gap-2">
-          <Link
-            href="/admin/changelog"
-            className="rounded-lg bg-violet-600 px-3.5 py-1.5 text-sm font-semibold text-white hover:bg-violet-700"
-          >
-            Manage changelog
-          </Link>
-          <LogoutButton />
-        </div>
+        <Link
+          href="/admin/changelog"
+          className="rounded-lg bg-violet-600 px-3.5 py-1.5 text-sm font-semibold text-white hover:bg-violet-700"
+        >
+          Manage changelog
+        </Link>
       </section>
 
       <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-5">

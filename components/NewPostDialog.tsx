@@ -1,11 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState, useEffect, useRef, useState } from "react";
 import { createPost, type FormState } from "@/lib/actions";
 import { APPS } from "@/lib/config";
 import { CATEGORIES, CATEGORY_META } from "@/lib/types";
 
-export function NewPostDialog({ defaultName }: { defaultName: string }) {
+export function NewPostDialog() {
   const [open, setOpen] = useState(false);
   const [category, setCategory] = useState<string>("FEATURE");
   const [state, formAction, isPending] = useActionState<FormState, FormData>(createPost, undefined);
@@ -14,6 +15,15 @@ export function NewPostDialog({ defaultName }: { defaultName: string }) {
   useEffect(() => {
     if (open) titleRef.current?.focus();
   }, [open]);
+
+  // The keyboard shortcuts overlay ("c") asks us to open via a window event.
+  useEffect(() => {
+    function onOpenRequest() {
+      setOpen(true);
+    }
+    window.addEventListener("slikk:new-post", onOpenRequest);
+    return () => window.removeEventListener("slikk:new-post", onOpenRequest);
+  }, []);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -50,7 +60,11 @@ export function NewPostDialog({ defaultName }: { defaultName: string }) {
               <div>
                 <h2 className="text-lg font-semibold text-stone-900">Create a post</h2>
                 <p className="mt-0.5 text-sm text-stone-500">
-                  Search the board first — if it already exists, upvote it instead.
+                  Search the board first — if it already exists, upvote it instead. See the{" "}
+                  <Link href="/guidelines" className="text-violet-700 underline" onClick={() => setOpen(false)}>
+                    posting guidelines
+                  </Link>
+                  .
                 </p>
               </div>
               <button
@@ -119,37 +133,22 @@ export function NewPostDialog({ defaultName }: { defaultName: string }) {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label htmlFor="post-app" className="mb-1 block text-sm font-medium text-stone-700">
-                    App
-                  </label>
-                  <select
-                    id="post-app"
-                    name="appId"
-                    className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
-                  >
-                    <option value="">All apps</option>
-                    {APPS.map((app) => (
-                      <option key={app.id} value={app.id}>
-                        {app.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label htmlFor="post-name" className="mb-1 block text-sm font-medium text-stone-700">
-                    Your name
-                  </label>
-                  <input
-                    id="post-name"
-                    name="authorName"
-                    defaultValue={defaultName}
-                    maxLength={50}
-                    placeholder="Anonymous"
-                    className="w-full rounded-xl border border-stone-200 bg-white px-3.5 py-2.5 text-sm outline-none transition placeholder:text-stone-400 focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
-                  />
-                </div>
+              <div>
+                <label htmlFor="post-app" className="mb-1 block text-sm font-medium text-stone-700">
+                  App
+                </label>
+                <select
+                  id="post-app"
+                  name="appId"
+                  className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
+                >
+                  <option value="">All apps</option>
+                  {APPS.map((app) => (
+                    <option key={app.id} value={app.id}>
+                      {app.name}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               {state?.error && (
