@@ -19,14 +19,19 @@ database-backed (httpOnly cookie, 30 days) and passwords are hashed with scrypt 
 Members are automatically subscribed to posts they create, vote on, or comment on, and get an in-app notification
 (bell in the header) when a post's status changes, the team responds, or someone comments.
 
-## Quick start
+## Quick start (local development)
 
 ```bash
-npm install            # also runs `prisma generate`
-cp .env.example .env   # then set ADMIN_EMAIL / ADMIN_PASSWORD
-npm run setup          # creates the SQLite db + seeds demo data
-npm run dev            # http://localhost:3000
+npm install                                     # also runs `prisma generate`
+cp .env.example .env                            # set ADMIN_EMAIL / ADMIN_PASSWORD
+docker compose -f docker-compose.dev.yml up -d  # PostgreSQL for local dev
+npm run setup                                   # push schema + seed demo data
+npm run dev                                     # http://localhost:3000
 ```
+
+Prefer your own database? Point `DATABASE_URL` in `.env` at any PostgreSQL
+instance and run `npm run setup`. To deploy, jump to
+[Stack & deployment](#stack--deployment).
 
 The seed creates the **admin account** from `ADMIN_EMAIL` / `ADMIN_PASSWORD` in your `.env`
 (defaults: `admin@slikk.app` / `slikk-admin`), plus demo users (`maya@example.com`, … — password `slikk-demo`).
@@ -121,18 +126,56 @@ board / roadmap / changelog / notifications.
 
 ## Stack & deployment
 
-Next.js (App Router, server actions) · Prisma · SQLite · Tailwind CSS.
+Next.js (App Router, server actions) · Prisma · PostgreSQL · Tailwind CSS.
 
-Deploy anywhere a Node server with a persistent disk runs (Railway, Fly.io, Render, a VPS):
+The container is self-bootstrapping: on every start it applies migrations
+(`prisma migrate deploy`) and ensures the admin account exists from
+`ADMIN_EMAIL` / `ADMIN_PASSWORD`. Both steps are idempotent — they never wipe or
+overwrite existing data (that's what the dev-only `npm run db:seed` is for).
+Readiness is gated by a health check at `GET /api/health` (200 only when the
+database is reachable).
+
+### Docker Compose
+
+The repo ships a production [`Dockerfile`](Dockerfile) and
+[`docker-compose.yml`](docker-compose.yml) (Next.js app + PostgreSQL, with
+healthchecks and a `pgdata` volume for persistence):
 
 ```bash
-npm run build && npm start
+cp .env.example .env     # set ADMIN_EMAIL, ADMIN_PASSWORD, POSTGRES_PASSWORD
+docker compose up -d --build
 ```
 
-Set `DATABASE_URL`, `ADMIN_EMAIL`, and `ADMIN_PASSWORD` in the environment. SQLite needs a persistent volume; for
-serverless hosts (e.g. Vercel) switch the `datasource` provider in
-[`prisma/schema.prisma`](prisma/schema.prisma) to `postgresql` and point `DATABASE_URL` at a hosted Postgres —
-no code changes needed.
+The app listens on port 3000 on the Docker network. Put a reverse proxy in front
+for TLS, or uncomment the `ports:` block in `docker-compose.yml` to publish it
+directly. Set `APP_URL` (and optionally `ALLOWED_ORIGINS`) to your public URL so
+Server Actions trust the proxied host.
+
+### Coolify
+
+`docker-compose.yml` is Coolify-ready — its built-in Traefik handles HTTPS:
+
+1. Create a **Docker Compose** resource pointing at this repo.
+2. Set a **domain** on the `app` service. Coolify terminates TLS and routes to
+   port 3000 (wired through the `SERVICE_FQDN_APP_3000` magic variable).
+3. Set `ADMIN_EMAIL` and `ADMIN_PASSWORD` in the environment — the Postgres
+   password is generated for you via `SERVICE_PASSWORD_POSTGRES`.
+4. Deploy. `GET /api/health` is used as the health check.
+
+### Anywhere else
+
+Any host that runs a Node server against a PostgreSQL database (Railway, Fly.io,
+Render, a VPS):
+
+```bash
+npm ci
+npm run build
+npm run migrate:deploy    # apply migrations
+npm run bootstrap-admin   # create/ensure the admin account
+npm start                 # next start
+```
+
+Set `DATABASE_URL`, `ADMIN_EMAIL`, and `ADMIN_PASSWORD` in the environment.
 
 ## Scripts
 
@@ -140,8 +183,11 @@ no code changes needed.
 | --- | --- |
 | `npm run dev` | Dev server |
 | `npm run build` / `npm start` | Production build / serve |
-| `npm run db:push` | Create/update the database schema |
-| `npm run db:seed` | Reset and seed demo data (creates the admin account) |
+| `npm run migrate:deploy` | Apply migrations (production / containers) |
+| `npm run migrate:dev` | Create + apply a migration during development |
+| `npm run bootstrap-admin` | Idempotently create/ensure the admin account (no data loss) |
+| `npm run db:push` | Sync the schema to the database (dev convenience) |
+| `npm run db:seed` | Reset and seed demo data — destructive, dev only |
 | `npm run setup` | `db:push` + `db:seed` |
 | `npm run make-admin -- <email>` | Promote a registered account to admin |
 | `npm run release-notes [-- --publish]` | Generate release notes from shipped posts (drafts by default) |

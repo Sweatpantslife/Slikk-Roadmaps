@@ -1,0 +1,31 @@
+# Build context hygiene — keep secrets and local cruft out of the image.
+node_modules
+.next
+out
+build
+.git
+.gitignore
+.github
+
+# Local env / secrets (the image gets config via runtime env vars).
+.env
+.env.*
+!.env.example
+
+# Local SQLite leftovers (project now uses PostgreSQL).
+prisma/*.db
+prisma/*.db-journal
+
+# Tooling / editor / OS noise.
+coverage
+.vercel
+*.tsbuildinfo
+next-env.d.ts
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.DS_Store
+
+# Docs and compose files aren't needed inside the image.
+*.md
+docker-compose*.yml

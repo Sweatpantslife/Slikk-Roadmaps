@@ -1,0 +1,82 @@
+# Production stack: Next.js app + PostgreSQL.
+#
+#   docker compose up -d --build
+#
+# Works as-is on Coolify (its built-in Traefik terminates TLS and routes to the
+# app once you assign a domain), and on a plain VPS / `docker compose up`.
+#
+# Set at minimum: ADMIN_EMAIL, ADMIN_PASSWORD, and a strong POSTGRES_PASSWORD
+# (Coolify can auto-generate the DB password via the SERVICE_PASSWORD_POSTGRES
+# magic variable). See .env.example.
+
+name: slikk-feedback-hub
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: slikk-feedback-hub:latest
+    restart: unless-stopped
+    init: true
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+
+      # --- Public URL / TLS ---------------------------------------------------
+      # Coolify: set a domain for this service (or define SERVICE_FQDN_APP_3000)
+      # and its Traefik terminates HTTPS and forwards to container port 3000.
+      # Plain compose: falls back to http://localhost:3000.
+      SERVICE_FQDN_APP_3000: ${SERVICE_FQDN_APP_3000:-}
+      APP_URL: ${APP_URL:-${SERVICE_FQDN_APP_3000:-http://localhost:3000}}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}
+
+      # --- Database -----------------------------------------------------------
+      DATABASE_URL: postgresql://${POSTGRES_USER:-slikk}:${POSTGRES_PASSWORD:-${SERVICE_PASSWORD_POSTGRES:-slikk_change_me}}@db:5432/${POSTGRES_DB:-slikk}?schema=public&connection_limit=10
+
+      # --- Admin account (created on first boot, never overwritten) -----------
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      ADMIN_NAME: ${ADMIN_NAME:-Slikk Team}
+
+      # --- Optional: enable POST /api/release-notes (+ /ingest) for cron/CI ----
+      RELEASE_NOTES_SECRET: ${RELEASE_NOTES_SECRET:-}
+
+    # Internal only — Coolify's proxy routes to this. For a plain VPS behind your
+    # own reverse proxy, uncomment `ports` below to publish it on the host.
+    expose:
+      - "3000"
+    # ports:
+    #   - "${APP_PORT:-3000}:3000"
+
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-slikk}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-${SERVICE_PASSWORD_POSTGRES:-slikk_change_me}}
+      POSTGRES_DB: ${POSTGRES_DB:-slikk}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-slikk} -d ${POSTGRES_DB:-slikk}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+volumes:
+  pgdata:

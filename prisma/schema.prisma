@@ -3,11 +3,12 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-// SQLite has no enums; string fields below hold the unions defined in lib/types.ts:
+// String fields below hold the unions defined in lib/types.ts (kept as strings
+// rather than native enums so statuses/labels can evolve without a migration):
 //   Post.category — "FEATURE" | "IMPROVEMENT" | "BUG"
 //   Post.status   — "UNDER_REVIEW" | "PLANNED" | "IN_PROGRESS" | "SHIPPED" | "CLOSED"
 //   ChangelogEntry.labels — comma-separated "NEW" | "IMPROVED" | "FIXED"
