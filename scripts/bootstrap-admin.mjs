@@ -16,7 +16,14 @@
 import { PrismaClient } from "@prisma/client";
 import { randomBytes, scryptSync } from "node:crypto";
 
-const WEAK_PASSWORDS = new Set(["change-me", "changeme", "slikk-admin", "password", "admin"]);
+const WEAK_PASSWORDS = new Set([
+  "change-me",
+  "changeme",
+  "change-me-to-a-strong-password",
+  "slikk-admin",
+  "password",
+  "admin",
+]);
 
 function hashPassword(password) {
   const salt = randomBytes(16).toString("hex");

@@ -34,7 +34,10 @@ services:
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}
 
       # --- Database -----------------------------------------------------------
-      DATABASE_URL: postgresql://${POSTGRES_USER:-slikk}:${POSTGRES_PASSWORD:-${SERVICE_PASSWORD_POSTGRES:-slikk_change_me}}@db:5432/${POSTGRES_DB:-slikk}?schema=public&connection_limit=10
+      # Set DATABASE_URL directly to point at an external database or to supply a
+      # pre-encoded connection string (e.g. a password with special characters).
+      # Otherwise it's assembled from the POSTGRES_* parts below.
+      DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-slikk}:${POSTGRES_PASSWORD:-${SERVICE_PASSWORD_POSTGRES:-slikk_change_me}}@db:5432/${POSTGRES_DB:-slikk}?schema=public&connection_limit=10}
 
       # --- Admin account (created on first boot, never overwritten) -----------
       ADMIN_EMAIL: ${ADMIN_EMAIL:-}
@@ -56,7 +59,7 @@ services:
         - CMD
         - node
         - -e
-        - "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+        - "fetch('http://127.0.0.1:' + (process.env.PORT || 3000) + '/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
       interval: 30s
       timeout: 5s
       retries: 5
