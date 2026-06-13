@@ -21,7 +21,12 @@ function boardWhere({ q, category, appId }: Omit<BoardFilters, "sort">): Prisma.
     ...(category ? { category } : {}),
     ...(appId ? { appId } : {}),
     ...(q
-      ? { OR: [{ title: { contains: q } }, { body: { contains: q } }] }
+      ? {
+          OR: [
+            { title: { contains: q, mode: "insensitive" } },
+            { body: { contains: q, mode: "insensitive" } },
+          ],
+        }
       : {}),
   };
 }

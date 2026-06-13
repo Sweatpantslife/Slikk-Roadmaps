@@ -11,6 +11,9 @@
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
     "setup": "prisma db push && tsx prisma/seed.ts",
+    "migrate:deploy": "prisma migrate deploy",
+    "migrate:dev": "prisma migrate dev",
+    "bootstrap-admin": "node scripts/bootstrap-admin.mjs",
     "make-admin": "tsx scripts/make-admin.ts",
     "release-notes": "tsx scripts/generate-release-notes.ts"
   },
@@ -20,6 +23,7 @@
   "dependencies": {
     "@prisma/client": "^6.19.3",
     "next": "16.2.9",
+    "prisma": "^6.19.3",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-markdown": "^10.1.0",
@@ -32,7 +36,6 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.9",
-    "prisma": "^6.19.3",
     "tailwindcss": "^4",
     "tsx": "^4.22.4",
     "typescript": "^5"
