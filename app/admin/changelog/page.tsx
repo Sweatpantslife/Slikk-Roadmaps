@@ -8,6 +8,7 @@ import { parseLabels } from "@/lib/types";
 import { formatDate } from "@/lib/format";
 import { AppChip, ChangelogLabelBadge } from "@/components/Badges";
 import { GenerateReleaseNotes } from "@/components/admin/GenerateReleaseNotes";
+import { ReleaseNotesIngestDoc } from "@/components/admin/ReleaseNotesIngestDoc";
 
 export const metadata: Metadata = { title: "Manage changelog" };
 
@@ -40,6 +41,8 @@ export default async function AdminChangelogPage() {
       <GenerateReleaseNotes
         pending={pendingGroups.map((g) => ({ appName: g.appName, postCount: g.posts.length }))}
       />
+
+      <ReleaseNotesIngestDoc />
 
       <div className="space-y-2.5">
         {entries.map((entry) => (
